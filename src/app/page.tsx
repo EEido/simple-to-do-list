@@ -1,13 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function Home() {
   const [taskInput, setTaskInput] = useState("");
   const [taskDesc, setTaskDesc] = useState("");
   const [tasks, setTasks] = useState<{ id: number; title: string; description: string; done: boolean }[]>([]);
 
-  const handleSaveTask = (e: React.FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        const response = await fetch("/api/tasks");
+        if (!response.ok) {
+          throw new Error("Network response is not okay");
+        }
+        const data = await response.json();
+        setTasks(data);
+      } catch (error) {
+        console.error("Failed to fetch", error);
+      }
+    };
+    fetchTasks();
+  }, []);
+
+  const handleSaveTask = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (taskInput.trim() === "") {
       return;
@@ -17,19 +33,40 @@ export default function Home() {
       finalDesc = "Desciption not found";
     }
     const newTask = {
-      id: Date.now(),
       title: taskInput,
       description: finalDesc,
       done: false,
     };
-
-    setTasks([newTask, ...tasks]);
-    setTaskInput("");
-    setTaskDesc("");
+    try {
+      const response = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-type": "application/json" },
+        body: JSON.stringify(newTask),
+      });
+      if (!response.ok) {
+        throw new Error("Network error");
+      }
+      const createdTask = await response.json();
+      setTasks([createdTask, ...tasks]);
+      setTaskInput("");
+      setTaskDesc("");
+    } catch (error) {
+      console.error("Create new task error", error);
+    }
   };
 
-  const handleClearTask = (id: number) => {
-    setTasks(tasks.filter((task) => task.id != id));
+  const handleClearTask = async (taskid: number) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskid}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to delete the task.");
+      }
+      setTasks(tasks.filter((task) => task.id != taskid));
+    } catch (error) {
+      console.error("Error in deleting:", error);
+    }
   };
   const handleDoneTask = (id: number) => {
     setTasks(tasks.map((task) => (task.id === id ? { ...task, done: !task.done } : task)));
